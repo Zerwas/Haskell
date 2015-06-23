@@ -1,10 +1,11 @@
 import Control.Monad.State.Lazy
 import Data.Tree
+import Data.List
 
 main = do
     wordlist <- readFile "aspell-dump-expand/aspell-dump-expand-de_DE.utf8.txt"
     text <- readFile "textfile.txt"
-    return (correct (trieify (words wordlist)) text)
+    return (check (trieify (words wordlist)) (words wordlist))--(correct (trieify (words wordlist)) text)
 
 -- * correct the text
 correct wordlist text = drawTree $ mapTree show wordlist
@@ -63,8 +64,13 @@ toLines (x:xs) w
 
 -- * usefull trie funtions
 
-check trie wordlist = (sublist triewords wordlist) &&  (length triewords == length wordlist)
+check trie wordlist = (length triewords,length $ (removeDubs "" (sort wordlist)))
      where triewords = collapse trie
+
+removeDubs _ [] = []
+removeDubs w (x:xs)
+    |x==w    = removeDubs w xs
+    |True    = x:(removeDubs x xs)
 
 
 collapse (Node (p,f) ts)
