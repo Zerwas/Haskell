@@ -13,11 +13,26 @@ correct wordlist text = drawTree $ mapTree show wordlist
 
 -- * Levenstein distance
 -- | adds levestein distance to given word to nodes
-ldist :: [Char] -> Tree ([Char],Bool) -> Tree ([Char],Bool,Int)
-ldist w (Node (p,f) ts)
-    |p == w    = Node (p,f,0) (map (ldist w) ts)
-    |True      = Node (p,f,1) (map (ldist w) ts)
+ldist :: [(Char,Int)] -> Tree ([Char],Bool) -> Tree ([Char],Bool,Int)
+ldist lrow (Node (p,f) ts) = Node (p,f,minimum $ map snd nlrow) (map (ldist nlrow) ts)
+    where nlrow = foldl calcNewRow lrow p 
 
+
+-- | calculate row with new distances
+calcNewRow :: [(Char,Int)] -> Char -> [(Char,Int)]
+calcNewRow ((x,left):xs) y = (x,left+1):(traverseRow xs y left (left+1))
+
+traverseRow :: [(Char,Int)] -> Char -> Int -> Int -> [(Char,Int)]
+traverseRow []            _ _     _         = []
+traverseRow ((x,left):xs) y belowleft below = (x,newbelow):(traverseRow xs y left newbelow)
+    where newbelow = min (belowleft + dist x y) ((min left below)+1)
+
+
+-- | cost for substituting y by x
+dist :: Char -> Char -> Int
+dist x y 
+    |x==y = 0
+    |True = 1
 
 -- | sortet list of best matches
 sortedResults :: Tree ([Char],Bool,Int) -> [([Char],Int)] 
