@@ -11,6 +11,27 @@ main = do
 correct wordlist text = drawTree $ mapTree show wordlist
 
 
+-- * Levenstein distance
+-- | adds levestein distance to given word to nodes
+ldist :: [Char] -> Tree ([Char],Bool) -> Tree ([Char],Bool,Int)
+ldist w (Node (p,f) ts)
+    |p == w    = Node (p,f,0) (map (ldist w) ts)
+    |True      = Node (p,f,1) (map (ldist w) ts)
+
+
+-- | sortet list of best matches
+sortedResults :: Tree ([Char],Bool,Int) -> [([Char],Int)] 
+sortedResults ts = concatMap (\d -> zip (wordsWithDist ts d) [d,d..]) [0..]
+
+
+-- | returns all words in trie with a certain distance
+wordsWithDist :: Tree ([Char],Bool,Int) -> Int -> [[Char]]
+wordsWithDist (Node (p,f,dist) ts) d
+    |dist == d && f    = p:[p++w | w <- concatMap (\t -> wordsWithDist t d) ts]
+    |dist <= d         =   [p++w | w <- concatMap (\t -> wordsWithDist t d) ts]
+    |True              = []
+
+
 -- * create trie from words
 trieify :: [[Char]] -> Tree ([Char],Bool)
 trieify wordlist = foldr insertWordTree (Node ("",False) []) wordlist
