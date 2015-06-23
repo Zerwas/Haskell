@@ -2,22 +2,23 @@ import Control.Monad.State.Lazy
 import Data.Tree
 
 main = do
-    words <- readFile "aspell-dump-expand/aspell-dump-expand-de_DE.utf8.txt"
-    text <- readFile "textfile"
-    return (correct (trieify (toLines words "")) text)
+    wordlist <- readFile "aspell-dump-expand/aspell-dump-expand-de_DE.utf8.txt"
+    text <- readFile "textfile.txt"
+    return (correct (trieify (words wordlist)) text)
 
-correct words text = undefined
+-- * correct the text
+correct wordlist text = drawTree $ mapTree show wordlist
 
 
 -- * create trie from words
 trieify :: [[Char]] -> Tree ([Char],Bool)
-trieify words = foldr insertWordTree (Node ("",False) []) words
+trieify wordlist = foldr insertWordTree (Node ("",False) []) wordlist
 
 
 -- | insert a word into a trie
 insertWordTree :: [Char] -> Tree ([Char],Bool) -> Tree ([Char],Bool)
 -- can split Node into two Nodes
-insertWordTree w (Node (praefix,final) ts)   =  (Node (newpraefix,newfinal) (insertWordList (insertWordList ts neww) newp))
+insertWordTree w (Node (praefix,final) ts) = (Node (newpraefix,newfinal) (insertWordList (movepraefix newp ts final) neww))
     where (newpraefix,newp,neww,newfinal) = getPreafix praefix w "" final
 
 
@@ -29,21 +30,52 @@ getPreafix (p:ps) (w:ws) l f
     |p==w     = getPreafix ps ws (l++[p]) f
     |True     = (l,(p:ps),(w:ws),False) 
 
+
+-- | push the preafix into the child nodes
+movepraefix :: [Char] -> [Tree ([Char], Bool)] -> Bool -> [Tree ([Char], Bool)]
+movepraefix "" ts                 _    = ts
+movepraefix p  ts                 True = [(Node (p,True) ts)]
+movepraefix p  []                 _    = error "leaf has to be True"
+movepraefix p  [(Node (w,f) ts)]  _    = [(Node (p++w,f) ts)]
+movepraefix p  ts                 _    = [(Node (p,False) ts)]
+
+
+insertWordList :: [Tree ([Char], Bool)] -> [Char] -> [Tree ([Char], Bool)]
 insertWordList ts    [] = ts
 insertWordList []     w = [(Node (w,True) [])]
 insertWordList (t:ts) w
     |startswith t w     = (insertWordTree w t):ts
     |True               = t:(insertWordList ts w) 
 
+
+startswith :: Eq a => Tree ([a], t) -> [a] -> Bool
 startswith (Node ((p:ps),_) ts) (w:ws) = p==w
 
 
+-- TODO delete
 -- | convert char array to list of words
 toLines :: [Char] -> [Char] -> [[Char]]
 toLines [] w = [reverse w]
 toLines (x:xs) w
     |x=='\n' = [reverse w] ++ (toLines xs "")
     |True    = toLines xs (x:w)
+
+
+-- * usefull trie funtions
+
+check trie wordlist = (sublist triewords wordlist) &&  (length triewords == length wordlist)
+     where triewords = collapse trie
+
+
+collapse (Node (p,f) ts)
+    |f        = p:[p++w | w <- concatMap collapse ts] 
+    |True     = [p++w | w <- concatMap collapse ts] 
+
+
+sublist :: Eq a => [a] -> [a] -> Bool
+sublist [] _      = True
+sublist (x:xs) ys = (foldr (\y f -> f || (x == y)) False ys) && (sublist xs ys)
+
 
 mapTree :: (a -> b) -> Tree a -> Tree b
 mapTree f (Node n ts) = (Node (f n) (map (mapTree f) ts))
