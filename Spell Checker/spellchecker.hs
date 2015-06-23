@@ -5,7 +5,8 @@ import Data.List
 main = do
     wordlist <- readFile "aspell-dump-expand/aspell-dump-expand-de_DE.utf8.txt"
     text <- readFile "textfile.txt"
-    return (check (trieify (words wordlist)) (words wordlist))--(correct (trieify (words wordlist)) text)
+    return (take 40 (sortedResults $ ldist (zip " Aachen" [0..]) (trieify (words wordlist))))  --(correct (trieify (words wordlist)) text)
+    --(check (trieify (words wordlist)) (words wordlist))
 
 -- * correct the text
 correct wordlist text = drawTree $ mapTree show wordlist
@@ -13,14 +14,15 @@ correct wordlist text = drawTree $ mapTree show wordlist
 
 -- * Levenstein distance
 -- | adds levestein distance to given word to nodes
-ldist :: [(Char,Int)] -> Tree ([Char],Bool) -> Tree ([Char],Bool,Int)
-ldist lrow (Node (p,f) ts) = Node (p,f,minimum $ map snd nlrow) (map (ldist nlrow) ts)
+ldist :: [(Char,Int)] -> Tree ([Char],Bool) -> Tree ([Char],Bool,Int,Int)
+ldist lrow (Node (p,f) ts) = Node (p,f,minimum $ map snd nlrow,snd $ head $ reverse nlrow) (map (ldist nlrow) ts)
     where nlrow = foldl calcNewRow lrow p 
 
 
 -- | calculate row with new distances
 calcNewRow :: [(Char,Int)] -> Char -> [(Char,Int)]
 calcNewRow ((x,left):xs) y = (x,left+1):(traverseRow xs y left (left+1))
+
 
 traverseRow :: [(Char,Int)] -> Char -> Int -> Int -> [(Char,Int)]
 traverseRow []            _ _     _         = []
@@ -34,16 +36,17 @@ dist x y
     |x==y = 0
     |True = 1
 
+
 -- | sortet list of best matches
-sortedResults :: Tree ([Char],Bool,Int) -> [([Char],Int)] 
+sortedResults :: Tree ([Char],Bool,Int,Int) -> [([Char],Int)] 
 sortedResults ts = concatMap (\d -> zip (wordsWithDist ts d) [d,d..]) [0..]
 
 
 -- | returns all words in trie with a certain distance
-wordsWithDist :: Tree ([Char],Bool,Int) -> Int -> [[Char]]
-wordsWithDist (Node (p,f,dist) ts) d
+wordsWithDist :: Tree ([Char],Bool,Int,Int) -> Int -> [[Char]]
+wordsWithDist (Node (p,f,mindist,dist) ts)  d
     |dist == d && f    = p:[p++w | w <- concatMap (\t -> wordsWithDist t d) ts]
-    |dist <= d         =   [p++w | w <- concatMap (\t -> wordsWithDist t d) ts]
+    |mindist <= d      =   [p++w | w <- concatMap (\t -> wordsWithDist t d) ts]
     |True              = []
 
 
