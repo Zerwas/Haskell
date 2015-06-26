@@ -1,15 +1,38 @@
 import Control.Monad.State.Lazy
 import Data.Tree
 import Data.List
+import System.Environment (getArgs, getProgName)
 
+main :: IO ()
 main = do
-    wordlist <- readFile "aspell-dump-expand/aspell-dump-expand-de_DE.utf8.txt"
-    text <- readFile "textfile.txt"
-    return (take 40 (sortedResults $ ldist (zip " Aachen" [0..]) (trieify (words wordlist))))  --(correct (trieify (words wordlist)) text)
+    args <- getArgs
+    wordlist <- readFile "aspell-dump-expand/aspell-dump-expand-de_DE.utf8.txt" --(args !! 0)
+    text <- readFile "textfile.txt" --(args !! 1)
+    writeFile "newfile.txt" ""
+    correctify (trieify (words wordlist)) text ""
+    --(take 40 (sortedResults $ ldist (zip " Aachen" [0..]) (trieify (words wordlist))))
     --(check (trieify (words wordlist)) (words wordlist))
 
 -- * correct the text
-correct wordlist text = drawTree $ mapTree show wordlist
+correctify :: Tree ([Char], Bool) -> [Char] -> [Char] -> IO ()
+correctify wordtrie []     _ = print "ready"
+correctify wordtrie (w:ws) p = 
+                            if (any (w ==) ['\n',' ',',','.',':'])
+                                then do
+                                    if (p /= [])
+                                        then do 
+                                            correct wordtrie p
+                                            appendFile "newfile.txt" [w]
+                                            correctify wordtrie ws []
+                                        else do
+                                            appendFile "newfile.txt" [w]
+                                            correctify wordtrie ws []
+                                else
+                                    correctify wordtrie ws (p++[w])
+
+correct :: Tree ([Char], Bool) -> [Char] -> IO ()
+correct wordtrie p = do
+                    appendFile "newfile.txt" (fst ((sortedResults $ ldist (zip (' ':p) [0..]) wordtrie)!!0))
 
 
 -- * Levenstein distance
@@ -103,8 +126,11 @@ toLines (x:xs) w
 
 -- * usefull trie funtions
 
-check trie wordlist = (length triewords,length $ (removeDubs "" (sort wordlist)))
-     where triewords = collapse trie
+check trie wordlist = (length triewords,length $ listwords, triewords == listwords)
+     where 
+        triewords = sort $ collapse trie
+        listwords = removeDubs "" (sort wordlist)
+
 
 removeDubs _ [] = []
 removeDubs w (x:xs)
