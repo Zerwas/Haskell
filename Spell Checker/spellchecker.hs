@@ -31,8 +31,40 @@ correctify wordtrie (w:ws) p =
                                     correctify wordtrie ws (p++[w])
 
 correct :: Tree ([Char], Bool) -> [Char] -> IO ()
-correct wordtrie p = do
-                    appendFile "newfile.txt" (fst ((sortedResults $ ldist (zip (' ':p) [0..]) wordtrie)!!0))
+correct wordtrie p = 
+    let results = map fst (sortedResults $ ldist (zip (' ':p) [0..]) wordtrie) in 
+                    do
+                        if ((results !! 0) == p)
+                            then -- ^ no error in word
+                                appendFile "newfile.txt" p
+                            else do
+                                putStrLn ("Mistake in " ++ p ++ " best corrections:")
+                                putStrLn (show (take 5 results))
+                                putStrLn "Enter 1-5 to take a suggestion 6 to display more results or enter the correct word manually."
+                                w <- getLine
+                                let n = (getNumber w) in 
+                                    if (n > 0 && n < 6)
+                                        then
+                                            appendFile "newfile.txt" (results!!(getNumber w))
+                                        else
+                                            if (n == 6)
+                                                then do
+                                                    putStrLn (show (take 20 results))
+                                                    putStrLn "Enter 1-20 to take a suggestion or enter the correct word manually."
+                                                    w2 <- getLine
+                                                    let n2 = (getNumber w2) in 
+                                                        if (n2 > 0 && n2 < 21)
+                                                            then
+                                                                appendFile "newfile.txt" (results!!(getNumber w2))
+                                                            else
+                                                                appendFile "newfile.txt" w2
+                                            else        
+                                                appendFile "newfile.txt" w
+
+
+-- | transforms a string of the number or into 21 if the string dos not one of the numbers 1..20
+getNumber :: [Char] -> Int
+getNumber w = foldl (\num (n,strn) -> if (w == strn) then n else num) 21 (zip [1..20] (map show [1..20]))
 
 
 -- * Levenstein distance
