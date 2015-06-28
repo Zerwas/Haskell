@@ -2,11 +2,12 @@ import Control.Monad.State.Lazy
 import Data.Tree
 import Data.List
 import System.Environment (getArgs, getProgName)
+import Data.Char
 
 main :: IO ()
 main = do
     args <- getArgs
-    wordlist <- readFile "aspell-dump-expand/aspell-dump-expand-de_DE.utf8.txt" --(args !! 0)
+    wordlist <- readFile "aspell-dump-expand/aspell-dump-expand-en.utf8.txt" --(args !! 0)
     text <- readFile "textfile.txt" --(args !! 1)
     writeFile "newfile.txt" "" -- ^ empty outputfile
     correctify (trieify (words wordlist)) text ""
@@ -17,7 +18,7 @@ main = do
 correctify :: Tree ([Char], Bool) -> [Char] -> [Char] -> IO ()
 correctify wordtrie []     _ = print "ready"
 correctify wordtrie (w:ws) p = 
-                            if (any (w ==) ['\n',' ',',','.',':','!','?',';'])
+                            if (not (isLetter w || w == '\''))
                                 then do
                                     when (p /= []) $
                                         correct (map fst (sortedResults $ ldist (zip (' ':p) [0..]) wordtrie)) p
@@ -56,7 +57,7 @@ getNumber w = foldl (\num (n,strn) -> if (w == strn) then n else num) 21 (zip [1
 
 -- * Levenstein distance
 -- | adds levestein distance to given word to nodes
-ldist :: [(Char,Int)] -> Tree ([Char],Bool) -> Tree ([Char],Bool,Int,Int)
+--ldist :: [((Char,Int),Maybe Char)] -> Tree ([Char],Bool) -> Tree ([Char],Bool,Int,Int)
 ldist lrow (Node (p,f) ts) = Node (p,f,minimum $ map snd nlrow,snd $ head $ reverse nlrow) (map (ldist nlrow) ts)
     where nlrow = foldl calcNewRow lrow p 
 
