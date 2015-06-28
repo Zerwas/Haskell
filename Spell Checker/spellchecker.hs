@@ -17,16 +17,12 @@ main = do
 correctify :: Tree ([Char], Bool) -> [Char] -> [Char] -> IO ()
 correctify wordtrie []     _ = print "ready"
 correctify wordtrie (w:ws) p = 
-                            if (any (w ==) ['\n',' ',',','.',':'])
+                            if (any (w ==) ['\n',' ',',','.',':','!','?',';'])
                                 then do
-                                    if (p /= [])
-                                        then do 
-                                            correct wordtrie p
-                                            appendFile "newfile.txt" [w]
-                                            correctify wordtrie ws []
-                                        else do
-                                            appendFile "newfile.txt" [w]
-                                            correctify wordtrie ws []
+                                    when (p /= []) $
+                                        correct wordtrie p
+                                    appendFile "newfile.txt" [w]
+                                    correctify wordtrie ws []
                                 else
                                     correctify wordtrie ws (p++[w])
 
@@ -35,7 +31,7 @@ correct wordtrie p =
     let results = map fst (sortedResults $ ldist (zip (' ':p) [0..]) wordtrie) in 
                     do
                         if ((results !! 0) == p)
-                            then -- ^ no error in word
+                            then -- no error in word
                                 appendFile "newfile.txt" p
                             else do
                                 putStrLn ("Mistake in " ++ p ++ " best corrections:")
@@ -62,7 +58,7 @@ correct wordtrie p =
                                                 appendFile "newfile.txt" w
 
 
--- | transforms a string of the number or into 21 if the string dos not one of the numbers 1..20
+-- | transforms a string of the number or into 21 if the string does not one of the numbers 1..20
 getNumber :: [Char] -> Int
 getNumber w = foldl (\num (n,strn) -> if (w == strn) then n else num) 21 (zip [1..20] (map show [1..20]))
 
