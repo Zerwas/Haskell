@@ -8,7 +8,7 @@ main = do
     args <- getArgs
     wordlist <- readFile "aspell-dump-expand/aspell-dump-expand-de_DE.utf8.txt" --(args !! 0)
     text <- readFile "textfile.txt" --(args !! 1)
-    writeFile "newfile.txt" ""
+    writeFile "newfile.txt" "" -- ^ empty outputfile
     correctify (trieify (words wordlist)) text ""
     --(take 40 (sortedResults $ ldist (zip " Aachen" [0..]) (trieify (words wordlist))))
     --(check (trieify (words wordlist)) (words wordlist))
@@ -20,42 +20,33 @@ correctify wordtrie (w:ws) p =
                             if (any (w ==) ['\n',' ',',','.',':','!','?',';'])
                                 then do
                                     when (p /= []) $
-                                        correct wordtrie p
+                                        correct (map fst (sortedResults $ ldist (zip (' ':p) [0..]) wordtrie)) p
                                     appendFile "newfile.txt" [w]
                                     correctify wordtrie ws []
                                 else
                                     correctify wordtrie ws (p++[w])
 
-correct :: Tree ([Char], Bool) -> [Char] -> IO ()
-correct wordtrie p = 
-    let results = map fst (sortedResults $ ldist (zip (' ':p) [0..]) wordtrie) in 
-                    do
-                        if ((results !! 0) == p)
-                            then -- no error in word
-                                appendFile "newfile.txt" p
-                            else do
-                                putStrLn ("Mistake in " ++ p ++ " best corrections:")
-                                putStrLn (show (take 5 results))
-                                putStrLn "Enter 1-5 to take a suggestion 6 to display more results or enter the correct word manually."
-                                w <- getLine
-                                let n = (getNumber w) in 
-                                    if (n > 0 && n < 6)
-                                        then
-                                            appendFile "newfile.txt" (results!!(getNumber w))
-                                        else
-                                            if (n == 6)
-                                                then do
-                                                    putStrLn (show (take 20 results))
-                                                    putStrLn "Enter 1-20 to take a suggestion or enter the correct word manually."
-                                                    w2 <- getLine
-                                                    let n2 = (getNumber w2) in 
-                                                        if (n2 > 0 && n2 < 21)
-                                                            then
-                                                                appendFile "newfile.txt" (results!!(getNumber w2))
-                                                            else
-                                                                appendFile "newfile.txt" w2
-                                            else        
-                                                appendFile "newfile.txt" w
+correct :: [[Char]] -> [Char] -> IO ()
+correct results p = 
+        do
+            if ((results !! 0) == p)
+                then -- no error in word
+                    appendFile "newfile.txt" p
+                else do
+                    putStrLn ("Mistake in " ++ p ++ " corrections:")
+                    putStrLn (show (take 5 results))
+                    putStrLn "Enter 1-5 to take a suggestion 6 to display more results or enter the correct word manually."
+                    w <- getLine
+                    let n = (getNumber w) in 
+                        if (n > 0 && n < 6)
+                            then
+                                appendFile "newfile.txt" (results!!(getNumber w))
+                            else
+                                if (n == 6)
+                                    then 
+                                        correct (drop 5 results) p
+                                    else        
+                                        appendFile "newfile.txt" w
 
 
 -- | transforms a string of the number or into 21 if the string does not one of the numbers 1..20
@@ -90,7 +81,7 @@ dist x y
 
 -- | sortet list of best matches
 sortedResults :: Tree ([Char],Bool,Int,Int) -> [([Char],Int)] 
-sortedResults ts = concatMap (\d -> zip (wordsWithDist ts d) [d,d..]) [0..]
+sortedResults ts = concatMap (\d -> zip (wordsWithDist ts d) [d,d..]) [0..100]
 
 
 -- | returns all words in trie with a certain distance
