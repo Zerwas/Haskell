@@ -1,6 +1,6 @@
 import Control.Monad.State.Lazy
 import Data.Tree
-import Data.List
+import Data.List hiding (insert)
 import System.Environment (getArgs, getProgName)
 import Data.Char
 import Data.Map hiding (foldr,foldl,map)
@@ -22,16 +22,16 @@ correctify wordtrie (w:ws) p =
                             if (not (isLetter w || w == '\'')) -- ^ words with ' are recognizeg too (e.g. ethnic's)
                                 then do
                                     when (p /= []) $
-                                        correct (map fst (sortedResults $ ldist (zip (' ':(map toLower p)) [0..]) wordtrie)) p -- ^ only consider lower cased word for levenstein distance
+                                        correct (sortedResults $ ldist (('@',0):(initalRow 0 (zip ('@':(map toLower p)) (map toLower p)))) wordtrie) p -- ^ only consider lower cased word for levenstein distance
                                     appendFile "newfile.txt" [w]
                                     correctify wordtrie ws []
                                 else
                                     correctify wordtrie ws (p++[w])
 
-correct :: [[Char]] -> [Char] -> IO ()
+correct :: [([Char],Int)] -> [Char] -> IO ()
 correct results p = 
         do
-            if ((results !! 0) == p)
+            if ((fst (results !! 0)) == p)
                 then -- no error in word
                     appendFile "newfile.txt" p
                 else do
@@ -39,10 +39,10 @@ correct results p =
                     putStrLn (show (take 5 results))
                     putStrLn "Enter 1-5 to take a suggestion 6 to display more results or enter the correct word manually."
                     w <- getLine
-                    let n = (getNumber w) in 
+                    let n = (getNumber w 1 6) in 
                         if (n > 0 && n < 6)
                             then
-                                appendFile "newfile.txt" (results!!(getNumber w))
+                                appendFile "newfile.txt" (fst (results!!n))
                             else
                                 if (n == 6)
                                     then 
@@ -52,11 +52,17 @@ correct results p =
 
 
 -- | transforms a string of the number or into 21 if the string does not one of the numbers 1..20
-getNumber :: [Char] -> Int
-getNumber w = foldl (\num (n,strn) -> if (w == strn) then n else num) 21 (zip [1..20] (map show [1..20]))
+getNumber :: [Char] -> Int -> Int -> Int
+getNumber w nmin nmax = foldl (\num (n,strn) -> if (w == strn) then n else num) (nmax+1) (zip [nmin..nmax] (map show [nmin..nmax]))
 
 
 -- * Levenstein distance
+initalRow :: Int -> [(Char, Char)] -> [(Char, Int)]
+initalRow _     []            = []
+initalRow below ((oldx,x):xs) = (x,newbelow):(initalRow newbelow xs)
+    where newbelow = (below + del oldx x)
+
+
 -- | adds levestein distance to given word to nodes
 ldist :: [(Char,Int)] -> Tree ([Char],Bool) -> Tree ([Char],Bool,Int,Int)
 ldist lrow (Node (p,f) ts) = Node (p,f,minimum $ map snd nlrow,snd $ head $ reverse nlrow) (map (ldist nlrow) ts)
@@ -65,32 +71,32 @@ ldist lrow (Node (p,f) ts) = Node (p,f,minimum $ map snd nlrow,snd $ head $ reve
 
 -- | calculate row with new distances
 calcNewRow :: [(Char,Int)] -> Char -> [(Char,Int)]
-calcNewRow ((x,left):xs) y = (x,newleft):(traverseRow xs y left newleft)
+calcNewRow ((x,left):xs) y = (x,newleft):(traverseRow xs x y left newleft)
     where newleft = left + ins x y 
 
 
-traverseRow :: [(Char,Int)] -> Char -> Int -> Int -> [(Char,Int)]
-traverseRow []            _ _     _         = []
-traverseRow ((x,left):xs) y belowleft below = (x,newbelow):(traverseRow xs y left newbelow)
-    where newbelow = min (belowleft + sub x y) (min (left + ins x y) (below + del x y))
+traverseRow :: [(Char,Int)] -> Char -> Char -> Int -> Int -> [(Char,Int)]
+traverseRow []            _    _ _     _         = []
+traverseRow ((x,left):xs) oldx y belowleft below = (x,newbelow):(traverseRow xs x y left newbelow)
+    where newbelow = min (belowleft + sub x y) (min (left + ins x y) (below + del oldx x))
 
 
 -- | cost for inserting y after x (leftarrow)
 ins :: Char -> Char -> Int
 --ins x y = 1
-ins = curry (\x -> findWithDefault 999 x (fromMatrix insertMatrix))
+ins = curry (\x -> findWithDefault 999 x (fromMatrix $ map words insertMatrix))
 
 -- | cost for deleting y after x (bottomarrow)
 del :: Char -> Char -> Int
 --del x y = 1
-del = curry (\x -> findWithDefault 999 x (fromMatrix deletionMatrix))
+del = curry (\x -> findWithDefault 999 x (fromMatrix $ map words deletionMatrix))
 
 -- | cost for substituting x by y (bottomleft)
 sub :: Char -> Char -> Int
 --sub x y 
 --    |x==y = 0
 --    |True = 1
-sub = curry (\x -> findWithDefault 999 x (fromMatrix substitutionMatrix))
+sub = curry (\x -> findWithDefault 999 x (fromMatrix $ map words substitutionMatrix))
 
 
 -- | sortet list of best matches
@@ -107,8 +113,10 @@ wordsWithDist (Node (p,f,mindist,dist) ts)  d
 
 
 -- ^ creates mapping from Matrix in string form
-fromMatrix :: [[Char]] -> Map (Char,Char) Int
-fromMatrix = undefined
+fromMatrix :: [[[Char]]] -> Map (Char,Char) Int
+fromMatrix (x:ys) = foldl (fromRow x) empty ys
+    where
+        fromRow x mapping ((y:[]):ys) = foldl (\mapp ((x:[]),n) -> insert (y,x) (getNumber n 0 999) mapp) mapping (zip x ys) 
 
 
 -- * create trie from words
