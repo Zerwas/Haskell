@@ -5,6 +5,7 @@ import System.Environment (getArgs, getProgName)
 import Data.Char
 import Data.Map hiding (foldr,foldl,map)
 
+
 main :: IO ()
 main = do
     args <- getArgs
@@ -65,13 +66,13 @@ initalRow below ((oldx,x):xs) = ((x,999),newbelow):(initalRow newbelow xs)
 
 -- | adds levestein distance to given word to nodes
 ldist :: ([((Char,Int),Int)],Char) -> Tree ([Char],Bool) -> Tree ([Char],Bool,Int,Int)
-ldist lcol (Node (p,f) ts) = Node (p,f,minimum $ map snd $ fst nlcol,snd $ head $ reverse $ fst nlcol) (map (ldist nlcol) ts)
+ldist lcol (Node (p,f) ts) = Node (p,f,minimum $ map (\((c,x),y) -> min x y) $ fst nlcol,snd $ head $ reverse $ fst nlcol) (map (ldist nlcol) ts)
     where nlcol = foldl calcNewCol lcol (map toLower p) 
 
 
 -- | calculate row with new distances
 calcNewCol :: ([((Char,Int),Int)],Char) -> Char -> ([((Char,Int),Int)],Char)
-calcNewCol ((((x,_),left):xs),oldy) y = (putSndCol (ncol) (999:999:(map snd ncol)),y)
+calcNewCol (col@(((x,_),left):xs),oldy) y = (putSndCol (ncol) (999:999:(map snd col)),y) -- ^ memorize the last two columns, the second one pushed up by 2 rows since we have to look at the value 2 left and 2 below to calculate the costs for reverse
     where 
         newleft = left + ins x y 
         ncol = ((x,0),newleft):(traverseCol xs x y oldy left newleft)
