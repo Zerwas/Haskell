@@ -93,10 +93,10 @@ del = curry (\x -> findWithDefault 999 x (fromMatrix $ map words deletionMatrix)
 
 -- | cost for substituting x by y (bottomleft)
 sub :: Char -> Char -> Int
---sub x y 
---    |x==y = 0
---    |True = 1
-sub = curry (\x -> findWithDefault 999 x (fromMatrix $ map words substitutionMatrix))
+sub x y 
+    |x==y = 0
+    |True = curry (\x -> findWithDefault 999 x (fromMatrix $ map words substitutionMatrix)) x y
+--sub = curry (\x -> findWithDefault 999 x (fromMatrix $ map words substitutionMatrix))
 
 
 -- | sortet list of best matches
@@ -116,7 +116,8 @@ wordsWithDist (Node (p,f,mindist,dist) ts)  d
 fromMatrix :: [[[Char]]] -> Map (Char,Char) Int
 fromMatrix (x:ys) = foldl (fromRow x) empty ys
     where
-        fromRow x mapping ((y:[]):ys) = foldl (\mapp ((x:[]),n) -> insert (y,x) (getNumber n 0 999) mapp) mapping (zip x ys) 
+        fromRow x mapping ((y:[]):ys) = foldl (\mapp ((x:[]),n) -> insert (y,x) (value n) mapp) mapping (zip x ys) 
+            where value n = - fromInteger $ fromIntegral (getNumber n 0 999)/999
 
 
 -- * create trie from words
