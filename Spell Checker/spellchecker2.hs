@@ -3,7 +3,6 @@ import Data.Tree
 import Data.List hiding (insert)
 import System.Environment (getArgs, getProgName)
 import Data.Char
-import Data.Map hiding (foldr,foldl,map)
 
 
 main :: IO ()
@@ -13,10 +12,10 @@ main = do
     text <- readFile "textfile.txt" --(args !! 1)
     writeFile "newfile.txt" "" -- ^ empty outputfile
     correctify (trieify (words wordlist)) text ""
-    --(take 40 (sortedResults $ ldist (zip " Aachen" [0..]) (trieify (words wordlist))))
-    --(check (trieify (words wordlist)) (words wordlist))
 
 -- * correct the text
+
+-- | scan the text to find words correct them and write them into the output file
 correctify :: Tree ([Char], Bool) -> [Char] -> [Char] -> IO ()
 correctify wordtrie []     _ = print "ready"
 correctify wordtrie (w:ws) p = 
@@ -29,6 +28,8 @@ correctify wordtrie (w:ws) p =
                                 else
                                     correctify wordtrie ws (p++[w])
 
+
+-- | ask the user for correction of missspelled words
 correct :: [([Char],Int)] -> [Char] -> IO ()
 correct results p = 
         do
@@ -37,13 +38,13 @@ correct results p =
                     appendFile "newfile.txt" p
                 else do
                     putStrLn ("Mistake in " ++ p ++ " corrections:")
-                    putStrLn (show (take 5 results))
+                    putStrLn (show (map fst $ take 5 results))
                     putStrLn "Enter 1-5 to take a suggestion 6 to display more results or enter the correct word manually."
                     w <- getLine
                     let n = (getNumber w 1 6) in 
                         if (n > 0 && n < 6)
                             then
-                                appendFile "newfile.txt" (fst (results!!n))
+                                appendFile "newfile.txt" (fst (results!!(n-1)))
                             else
                                 if (n == 6)
                                     then 
@@ -77,9 +78,12 @@ calcNewCol (col@(((x,_),left):xs),oldy) y = (putSndCol (ncol) (999:999:(map snd 
         newleft = left + ins x y 
         ncol = ((x,0),newleft):(traverseCol xs x y oldy left newleft)
 
-        putSndCol [] _ = []
+        putSndCol :: [((Char,Int),Int)] -> [Int] -> [((Char,Int),Int)]
+        putSndCol []             _      = []
         putSndCol (((x,_),d):xs) (y:ys) = ((x,y),d):(putSndCol xs ys)
 
+
+-- | calculate the entries of the new column
 traverseCol :: [((Char,Int),Int)] -> Char -> Char -> Char -> Int -> Int -> [((Char,Int),Int)]
 traverseCol []                          _    _ _       _     _         = []
 traverseCol (((x,bbelowlleft),left):xs) oldx y oldy belowleft below = ((x,0),newbelow):(traverseCol xs x y oldy left newbelow)
@@ -97,8 +101,8 @@ del x y = 2
 -- | cost for substituting x by y (bottomleft)
 sub :: Char -> Char -> Int
 sub x y 
-    |x==y = 0
-    |True = 2
+    |x == y = 0
+    |True   = 2
 
 -- | cost for reversing the order of the last two letters (bbelowlleft)
 rev :: Char -> Char -> Char -> Char -> Int
@@ -109,14 +113,14 @@ rev y oldy x oldx
 
 -- | sortet list of best matches
 sortedResults :: Tree ([Char],Bool,Int,Int) -> [([Char],Int)] 
-sortedResults ts = concatMap (\d -> zip (wordsWithDist ts d) [d,d..]) [0..100]
+sortedResults ts = concatMap (\d -> zip (wordsWithDist ts d) [d,d..]) [0..999]
 
 
 -- | returns all words in trie with a certain distance
 wordsWithDist :: Tree ([Char],Bool,Int,Int) -> Int -> [[Char]]
 wordsWithDist (Node (p,f,mindist,dist) ts)  d
-    |dist == d && f    = p:[p++w | w <- concatMap (\t -> wordsWithDist t d) ts]
-    |mindist <= d      =   [p++w | w <- concatMap (\t -> wordsWithDist t d) ts]
+    |dist == d && f    = p:[p ++ w | w <- concatMap (\t -> wordsWithDist t d) ts]
+    |mindist <= d      =   [p ++ w | w <- concatMap (\t -> wordsWithDist t d) ts]
     |True              = []
 
 
@@ -137,7 +141,7 @@ getPreafix :: [Char] -> [Char] -> [Char] -> Bool -> ([Char],[Char],[Char],Bool)
 getPreafix ps     []     l f = (l,ps,[],True)
 getPreafix []     ws     l f = (l,[],ws,f)
 getPreafix (p:ps) (w:ws) l f
-    |p==w     = getPreafix ps ws (l++[p]) f
+    |p == w   = getPreafix ps ws (l++[p]) f
     |True     = (l,(p:ps),(w:ws),False) 
 
 
@@ -146,10 +150,11 @@ movepraefix :: [Char] -> [Tree ([Char], Bool)] -> Bool -> [Tree ([Char], Bool)]
 movepraefix "" ts                 _    = ts
 movepraefix p  ts                 True = [(Node (p,True) ts)]
 movepraefix p  []                 _    = error "leaf has to be True"
-movepraefix p  [(Node (w,f) ts)]  _    = [(Node (p++w,f) ts)]
+movepraefix p  [(Node (w,f) ts)]  _    = [(Node (p ++ w,f) ts)]
 movepraefix p  ts                 _    = [(Node (p,False) ts)]
 
 
+-- | insert a word into a list of subtries
 insertWordList :: [Tree ([Char], Bool)] -> [Char] -> [Tree ([Char], Bool)]
 insertWordList ts    [] = ts
 insertWordList []     w = [(Node (w,True) [])]
@@ -158,37 +163,36 @@ insertWordList (t:ts) w
     |True               = t:(insertWordList ts w) 
 
 
+-- | check whether this is the right trie to insert the word
 startswith :: Eq a => Tree ([a], t) -> [a] -> Bool
-startswith (Node ((p:ps),_) ts) (w:ws) = p==w
+startswith (Node ((p:ps),_) ts) (w:ws) = p == w
 
 
 -- * usefull trie funtions
 
+-- | test whether a given trie contains all words in a given list
+check :: Tree ([Char], Bool) -> [[Char]] -> (Int, Int, Bool)
 check trie wordlist = (length triewords,length $ listwords, triewords == listwords)
      where 
         triewords = sort $ collapse trie
-        listwords = removeDubs "" (sort wordlist)
+        listwords = removeDubs [] (sort wordlist)
 
 
+-- | remove dublicates from a sorted list
+removeDubs :: Eq a => a -> [a] -> [a]
 removeDubs _ [] = []
 removeDubs w (x:xs)
     |x==w    = removeDubs w xs
     |True    = x:(removeDubs x xs)
 
 
+-- | exract a list of all words in a trie
+collapse :: Tree ([a], Bool) -> [[a]]
 collapse (Node (p,f) ts)
     |f        = p:[p++w | w <- concatMap collapse ts] 
     |True     = [p++w | w <- concatMap collapse ts] 
 
 
-sublist :: Eq a => [a] -> [a] -> Bool
-sublist [] _      = True
-sublist (x:xs) ys = (foldr (\y f -> f || (x == y)) False ys) && (sublist xs ys)
-
-
-mapTree :: (a -> b) -> Tree a -> Tree b
-mapTree f (Node n ts) = (Node (f n) (map (mapTree f) ts))
-
-
+-- | draw a trie into the console
 drawTrie :: Show a => Tree a -> IO ()
-drawTrie trie = putStrLn $ drawTree $ mapTree show trie
+drawTrie trie = putStrLn $ drawTree $ fmap show trie
