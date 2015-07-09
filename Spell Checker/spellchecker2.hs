@@ -1,4 +1,3 @@
-import Control.Monad.State.Lazy
 import Data.Tree
 import Data.List hiding (insert)
 import System.Environment (getArgs, getProgName)
@@ -8,34 +7,42 @@ import Data.Char
 main :: IO ()
 main = do
     args <- getArgs
-    wordlist <- readFile "aspell-dump-expand/aspell-dump-expand-en.utf8.txt" --(args !! 0)
-    text <- readFile "textfile.txt" --(args !! 1)
-    writeFile "newfile.txt" "" -- ^ empty outputfile
-    correctify (trieify (words wordlist)) text ""
+    if (length args /= 3)
+        then
+            print "You need to input the three arguments: wordlist inputfile outputfile"
+        else do
+            wordlist <- readFile (args !! 0)-- "aspell-dump-expand/aspell-dump-expand-en.utf8.txt"
+            text <- readFile (args !! 1) --"textfile.txt"
+            writeFile (args !! 2) "" -- ^ empty outputfile
+            correctify (trieify (words wordlist)) text "" (args !! 2)
 
 -- * correct the text
 
 -- | scan the text to find words correct them and write them into the output file
-correctify :: Tree ([Char], Bool) -> [Char] -> [Char] -> IO ()
-correctify wordtrie []     _ = print "ready"
-correctify wordtrie (w:ws) p = 
+correctify :: Tree ([Char], Bool) -> [Char] -> [Char] -> [Char] -> IO ()
+correctify wordtrie []     _ _          = print "ready"
+correctify wordtrie (w:ws) p outputfile = 
                             if (not (isLetter w || w == '\'')) -- ^ words with ' are recognizeg too (e.g. ethnic's)
                                 then do
-                                    when (p /= []) $
-                                        correct (sortedResults $ ldist (((('@',999),0):(initalRow 0 (zip ('@':(map toLower p)) (map toLower p)))),'@') wordtrie) p -- ^ only consider lower cased word for levenstein distance
-                                    appendFile "newfile.txt" [w]
-                                    correctify wordtrie ws []
+                                    if (p /= []) 
+                                        then
+                                            do
+                                                correct (sortedResults $ ldist (((('@',999),0):(initalRow 0 (zip ('@':(map toLower p)) (map toLower p)))),'@') wordtrie) p outputfile-- ^ only consider lower cased word for levenstein distance
+                                                appendFile outputfile [w]
+                                        else
+                                            appendFile outputfile [w]
+                                    correctify wordtrie ws [] outputfile
                                 else
-                                    correctify wordtrie ws (p++[w])
+                                    correctify wordtrie ws (p++[w]) outputfile
 
 
 -- | ask the user for correction of missspelled words
-correct :: [([Char],Int)] -> [Char] -> IO ()
-correct results p = 
+correct :: [([Char],Int)] -> [Char] -> [Char] -> IO ()
+correct results p outputfile = 
         do
             if ((fst (results !! 0)) == p)
                 then -- no error in word
-                    appendFile "newfile.txt" p
+                    appendFile outputfile p
                 else do
                     putStrLn ("Mistake in " ++ p ++ " corrections:")
                     putStrLn (show (map fst $ take 5 results))
@@ -44,13 +51,13 @@ correct results p =
                     let n = (getNumber w 1 6) in 
                         if (n > 0 && n < 6)
                             then
-                                appendFile "newfile.txt" (fst (results!!(n-1)))
+                                appendFile outputfile (fst (results!!(n-1)))
                             else
                                 if (n == 6)
                                     then 
-                                        correct (drop 5 results) p
+                                        correct (drop 5 results) p outputfile
                                     else        
-                                        appendFile "newfile.txt" w
+                                        appendFile outputfile w
 
 
 -- | transforms a string of the number or into 21 if the string does not one of the numbers 1..20
@@ -132,7 +139,7 @@ trieify wordlist = foldr insertWordTree (Node ("",False) []) wordlist
 -- | insert a word into a trie
 insertWordTree :: [Char] -> Tree ([Char],Bool) -> Tree ([Char],Bool)
 -- can split Node into two Nodes
-insertWordTree w (Node (praefix,final) ts) = (Node (newpraefix,newfinal) (insertWordList (movepraefix newp ts final) neww))
+insertWordTree w (Node (praefix,final) ts) = ts `seq` (Node (newpraefix,newfinal) (insertWordList (movepraefix newp ts final) neww))
     where (newpraefix,newp,neww,newfinal) = getPreafix praefix w "" final
 
 
