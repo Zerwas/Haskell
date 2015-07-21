@@ -133,7 +133,7 @@ wordsWithDist (Node (p,f,mindist,dist) ts)  d
 
 -- * create trie from words
 trieify :: [[Char]] -> Tree ([Char],Bool)
-trieify wordlist = foldr insertWordTree (Node ("",False) []) wordlist
+trieify wordlist = foldl (\t w -> insertWordTree w t) (Node ("",False) []) wordlist
 
 
 -- | insert a word into a trie
